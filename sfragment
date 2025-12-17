@@ -1,297 +1,262 @@
---[[ 
-    AUTO RYUGA QUEST + AUTO ATTACK 2 ENEMY
-    FLOW:
-    1) Tween ke posisi quest (Ryuga)
-       - Buka dialog
-       - Choice = "[ Repeatable Quest ]"  (ambil quest)
-       - Exit
-    2) Bunuh Utsumi Lv.80 (loop tween + combo)
-    3) Bunuh Mad Isurugi Lv.80 (loop tween + combo)
-    4) Balik ke Ryuga
-       - Buka dialog
-       - Choice = "[ Repeatable Quest ]"  (complete + ambil ulang)
-       - Exit
-    5) Ulang dari langkah 1
-]]
+-- AUTO RYUGA QUEST + AUTO ATTACK 2 ENEMY (MAGNET, TELEPORT)
 
-local Players           = game:GetService("Players")
-local TweenService      = game:GetService("TweenService")
+--====== SERVICES & PLAYER ======--
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-local StarterGui        = game:GetService("StarterGui")
+local Workspace      = game:GetService("Workspace")
 
-local player = Players.LocalPlayer
+local player         = Players.LocalPlayer
+local character      = player.Character or player.CharacterAdded:Wait()
+local humanoid       = character:WaitForChild("Humanoid")
+local hrp            = character:WaitForChild("HumanoidRootPart")
 
----------------------------------------------------------------------
--- KONFIGURASI POSISI & TARGET
----------------------------------------------------------------------
+--====== CONFIG ======--
 
-local QUEST_POS = Vector3.new(3451.86572265625, -3.170717477798462, -1804.986328125)
-local QUEST_TWEEN_TIME = 2
+-- Koordinat NPC Ryuga
+local RYUGA_POS = Vector3.new(
+    3441.72265625,
+    7.071476936340332,
+    -1803.548095703125
+)
 
-local FOLLOW_DISTANCE = 5 -- jarak di depan musuh
+local ENEMY1_NAME = "Utsumi Lv.80"
+local ENEMY2_NAME = "Mad Isurugi Lv.80"
 
-local function getEnemy1()
-    return Workspace.Lives:FindFirstChild("Utsumi Lv.80")
+-- Magnet offset 5 stud di depan enemy
+local MAGNET_OFFSET = Vector3.new(0, 0, -5)
+
+--====== UTIL ======--
+
+local function refreshCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoid  = character:WaitForChild("Humanoid")
+    hrp       = character:WaitForChild("HumanoidRootPart")
 end
 
-local function getEnemy2()
-    return Workspace.Lives:FindFirstChild("Mad Isurugi Lv.80")
+--====== TELEPORT KE RYUGA (WARP) ======--
+
+local function teleportToRyuga()
+    refreshCharacter()
+    hrp.CFrame = CFrame.new(RYUGA_POS)
 end
 
----------------------------------------------------------------------
--- FUNGSI UTIL
----------------------------------------------------------------------
-
-local function getCharHRP()
-    local char = player.Character or player.CharacterAdded:Wait()
-    return char:WaitForChild("HumanoidRootPart")
-end
-
-local function tweenToPosition(targetPos, time)
-    local hrp = getCharHRP()
-    local tweenInfo = TweenInfo.new(time or 1.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    tween.Completed:Wait()
-end
-
-local function enemyAlive(model)
-    return model
-        and model.Parent
-        and model:FindFirstChild("Humanoid")
-        and model.Humanoid.Health > 0
-end
-
----------------------------------------------------------------------
--- NPC RYUGA + QUEST
----------------------------------------------------------------------
+--====== QUEST RYUGA ======--
 
 local function clickRyuga()
     local npcFolder = Workspace:FindFirstChild("NPC")
     if not npcFolder then return end
 
-    local npc = npcFolder:FindFirstChild("Ryuga")
-    if not npc then return end
+    local ryuga = npcFolder:FindFirstChild("Ryuga")
+    if not ryuga then return end
 
-    local cd = npc:FindFirstChildOfClass("ClickDetector")
-    if not cd then return end
-
-    if typeof(fireclickdetector) == "function" then
+    local cd = ryuga:FindFirstChildOfClass("ClickDetector")
+    if cd then
         fireclickdetector(cd)
-    else
-        cd.MaxActivationDistance = 999999
     end
 end
 
-local function openQuestDialogue()
-    clickRyuga()
-end
-
--- Kirim pilihan [ Repeatable Quest ] (dipakai saat start & selesai)
-local function sendRepeatableQuestChoice()
+local function openQuestDialog()
     local args = {
         {
             Choice = "[ Repeatable Quest ]"
         }
     }
-    ReplicatedStorage
-        :WaitForChild("Remote")
-        :WaitForChild("Event")
-        :WaitForChild("Dialogue")
-        :FireServer(unpack(args))
+    ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Dialogue"):FireServer(unpack(args))
 end
 
-local function exitDialogue()
+local function closeDialog()
     local args = {
         {
             Exit = true
         }
     }
-    ReplicatedStorage
-        :WaitForChild("Remote")
-        :WaitForChild("Event")
-        :WaitForChild("Dialogue")
-        :FireServer(unpack(args))
+    ReplicatedStorage:WaitForChild("Remote"):WaitForChild("Event"):WaitForChild("Dialogue"):FireServer(unpack(args))
 end
 
----------------------------------------------------------------------
--- AUTO COMBO ATTACK
----------------------------------------------------------------------
+local function takeQuest()
+    clickRyuga()
+    task.wait(0.3)
+    openQuestDialog()
+    task.wait(0.2)
+    closeDialog()
+end
 
-local function fireHeavy(mouseCf)
+local function completeQuest()
+    clickRyuga()
+    task.wait(0.3)
+    openQuestDialog()
+    task.wait(0.2)
+    closeDialog()
+end
+
+--====== AUTO ATTACK (5 HIT) ======--
+
+local function fireHeavy()
     local args = {
         {
             CombatAction = true,
-            AttackType   = "Down",
-            HeavyAttack  = true,
-            MouseData    = mouseCf
+            AttackType = "Down",
+            HeavyAttack = true,
+            MouseData = CFrame.new(-257.47674560546875, 9.776947975158691, -862.2208251953125, 1,0,0, 0,1,0, 0,0,1)
         }
     }
-    player.Character
-        :WaitForChild("PlayerHandler")
-        :WaitForChild("HandlerEvent")
-        :FireServer(unpack(args))
+    player.Character:WaitForChild("PlayerHandler"):WaitForChild("HandlerEvent"):FireServer(unpack(args))
 end
 
-local function fireSkill(key, mouseCf)
-    local args = {
-        {
-            Skill       = true,
-            AttackType  = "Down",
-            Key         = key,
-            MouseData   = mouseCf
-        }
-    }
-    player.Character
-        :WaitForChild("PlayerHandler")
-        :WaitForChild("HandlerEvent")
-        :FireServer(unpack(args))
-end
-
-local function fireLight(mouseCf)
+local function fireBasic()
     local args = {
         {
             CombatAction = true,
-            LightAttack  = true,
-            MouseData    = mouseCf
+            LightAttack = true,
+            MouseData = CFrame.new(-257.47674560546875, 9.776947975158691, -862.2208251953125, 1,0,0, 0,1,0, 0,0,1)
         }
     }
-    player.Character
-        :WaitForChild("PlayerHandler")
-        :WaitForChild("HandlerEvent")
-        :FireServer(unpack(args))
+    player.Character:WaitForChild("PlayerHandler"):WaitForChild("HandlerEvent"):FireServer(unpack(args))
 end
 
--- heavy → E → heavy → basic → R → heavy → V
-local function doComboOnce()
-    fireHeavy(CFrame.new(3455.834716796875, -3.170717477798462, -1906.27197265625))
-    task.wait(0.2)
-
-    fireSkill("E", CFrame.new(3341.731689453125, -3.170717477798462, -1900.4713134765625))
-    task.wait(0.2)
-
-    fireHeavy(CFrame.new(3455.834716796875, -3.170717477798462, -1906.27197265625))
-    task.wait(0.2)
-
-    fireLight(CFrame.new(3305.84912109375, -3.1452293395996094, -2098.159912109375))
-    task.wait(0.2)
-
-    fireSkill("R", CFrame.new(3390.154296875, -3.170717477798462, -2009.615966796875))
-    task.wait(0.2)
-
-    fireHeavy(CFrame.new(3455.834716796875, -3.170717477798462, -1906.27197265625))
-    task.wait(0.2)
-
-    fireSkill("V", CFrame.new(3387.401123046875, -3.170717477798462, -2009.318603515625))
+local function fireSkillE()
+    local args = {
+        {
+            Skill = true,
+            AttackType = "Down",
+            Key = "E",
+            MouseData = CFrame.new(-257.47674560546875, 9.776947975158691, -862.2208251953125, 1,0,0, 0,1,0, 0,0,1)
+        }
+    }
+    player.Character:WaitForChild("PlayerHandler"):WaitForChild("HandlerEvent"):FireServer(unpack(args))
 end
 
----------------------------------------------------------------------
--- MAIN LOOP AUTO FARM
----------------------------------------------------------------------
+local function fireSkillR()
+    local args = {
+        {
+            Skill = true,
+            AttackType = "Down",
+            Key = "R",
+            MouseData = CFrame.new(-262.78973388671875, 5.367349624633789, -859.2238159179688, 1,0,0, 0,1,0, 0,0,1)
+        }
+    }
+    player.Character:WaitForChild("PlayerHandler"):WaitForChild("HandlerEvent"):FireServer(unpack(args))
+end
 
-local running = false
+local function fireSkillV()
+    local args = {
+        {
+            Skill = true,
+            AttackType = "Down",
+            Key = "V",
+            MouseData = CFrame.new(-374.3337707519531, 10.645843505859375, -631.1005859375, 1,0,0, 0,1,0, 0,0,1)
+        }
+    }
+    player.Character:WaitForChild("PlayerHandler"):WaitForChild("HandlerEvent"):FireServer(unpack(args))
+end
 
-local function fightEnemyLoop(enemyGetter)
-    local enemy = enemyGetter()
-    if not enemyAlive(enemy) then return end
+-- heavy, E, heavy, basic, R, heavy, V
+local function comboOnce()
+    fireHeavy()
+    task.wait(0.25)
 
-    while running and enemyAlive(enemy) do
-        local root = enemy:FindFirstChild("HumanoidRootPart")
-        if not root then break end
+    fireSkillE()
+    task.wait(0.4)
 
-        local targetPos = root.Position - root.CFrame.LookVector * FOLLOW_DISTANCE
+    fireHeavy()
+    task.wait(0.25)
 
-        local hrp = getCharHRP()
-        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
-        tween:Play()
-        tween.Completed:Wait()
+    fireBasic()
+    task.wait(0.25)
 
-        doComboOnce()
+    fireSkillR()
+    task.wait(0.4)
+
+    fireHeavy()
+    task.wait(0.25)
+
+    fireSkillV()
+    task.wait(0.6)
+end
+
+--====== MAGNET KE ENEMY ======--
+
+local magnetConnection
+
+local function startMagnetToEnemy(enemy)
+    if magnetConnection then
+        magnetConnection:Disconnect()
+        magnetConnection = nil
+    end
+
+    magnetConnection = RunService.Heartbeat:Connect(function()
+        if not enemy or not enemy.Parent or not enemy:FindFirstChild("HumanoidRootPart") then
+            return
+        end
+
+        local char = player.Character
+        if not char then return end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        local enemyHRP = enemy.HumanoidRootPart
+        local targetCFrame = enemyHRP.CFrame * CFrame.new(MAGNET_OFFSET)
+        root.CFrame = CFrame.new(targetCFrame.Position, enemyHRP.Position)
+    end)
+end
+
+local function stopMagnet()
+    if magnetConnection then
+        magnetConnection:Disconnect()
+        magnetConnection = nil
     end
 end
 
-local function autoFarmLoop()
-    running = true
-
-    while running do
-        -- 1. Tween ke posisi Ryuga
-        tweenToPosition(QUEST_POS, QUEST_TWEEN_TIME)
-
-        -- 2. START QUEST: buka dialog + [Repeatable] + Exit
-        openQuestDialogue()
-        task.wait(0.5)
-        sendRepeatableQuestChoice() -- start quest
-        task.wait(0.2)
-        exitDialogue()
-
-        -- 3. Bunuh Utsumi + Mad Isurugi
-        fightEnemyLoop(getEnemy1)
-        fightEnemyLoop(getEnemy2)
-
-        -- 4. Balik ke Ryuga
-        tweenToPosition(QUEST_POS, QUEST_TWEEN_TIME)
-
-        -- 5. COMPLETE + AMBIL ULANG:
-        --    buka dialog → [Repeatable Quest] lagi → Exit
-        openQuestDialogue()
-        task.wait(0.5)
-        sendRepeatableQuestChoice() -- complete + langsung ambil ulang
-        task.wait(0.2)
-        exitDialogue()
-
-        -- 6. Loop balik ke langkah 1
-    end
+local function getEnemyByName(name)
+    local lives = Workspace:FindFirstChild("Lives")
+    if not lives then return nil end
+    return lives:FindFirstChild(name)
 end
 
----------------------------------------------------------------------
--- GUI TOGGLE
----------------------------------------------------------------------
+local function killEnemyByName(name)
+    local enemy = getEnemyByName(name)
+    if not enemy then return end
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.ResetOnSpawn = false
-screenGui.Name = "AutoRyugaGui"
-screenGui.Parent = player:WaitForChild("PlayerGui")
+    startMagnetToEnemy(enemy)
 
-local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(260, 60)
-frame.Position = UDim2.new(0, 20, 0.5, -30)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-frame.BorderSizePixel = 0
-frame.Parent = screenGui
+    while enemy and enemy.Parent == Workspace:FindFirstChild("Lives") do
+        comboOnce()
+        task.wait(0.05)
+        enemy = getEnemyByName(name)
+    end
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 8)
-uiCorner.Parent = frame
+    stopMagnet()
+end
 
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.fromScale(1, 1)
-toggleBtn.BackgroundTransparency = 1
-toggleBtn.Text = "AUTO RYUGA FARM: OFF"
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 14
-toggleBtn.Parent = frame
+--====== MAIN LOOP ======--
 
-toggleBtn.MouseButton1Click:Connect(function()
-    running = not running
-    if running then
-        toggleBtn.Text = "AUTO RYUGA FARM: ON"
-        StarterGui:SetCore("SendNotification", {
-            Title = "Auto Ryuga",
-            Text  = "START",
-            Duration = 2
-        })
-        task.spawn(autoFarmLoop)
-    else
-        toggleBtn.Text = "AUTO RYUGA FARM: OFF"
-        StarterGui:SetCore("SendNotification", {
-            Title = "Auto Ryuga",
-            Text  = "STOP",
-            Duration = 2
-        })
+task.defer(function()
+    while true do
+        -- 1) Teleport ke Ryuga
+        teleportToRyuga()
+        task.wait(0.1)
+
+        -- 2) Ambil quest
+        takeQuest()
+        task.wait(0.3)
+
+        -- 3) Kill Utsumi Lv.80
+        killEnemyByName(ENEMY1_NAME)
+
+        -- 4) Kill Mad Isurugi Lv.80
+        killEnemyByName(ENEMY2_NAME)
+
+        -- 5) Balik teleport ke Ryuga, complete quest
+        task.wait(0.5)
+        teleportToRyuga()
+        task.wait(0.2)
+        completeQuest()
+
+        -- 6) Loop
+        task.wait(0.5)
     end
 end)
 
-print("Auto Ryuga Quest + Auto Attack (Repeatable start & finish) Loaded.")
+print("Auto Ryuga Quest + Auto Attack (2 Enemy, Magnet + Combo, Teleport) Loaded.")
